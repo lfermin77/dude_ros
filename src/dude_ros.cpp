@@ -95,13 +95,16 @@ class ROS_handler
 		  ROS_INFO("I heard: [%s]", msg->data.c_str());  
 		}
 		
+
+		
 //////////////////////////////////		
 		void mapCallback(const nav_msgs::OccupancyGridConstPtr& map)
 		{
 			
 			cv::Mat grad;
 			DuDe_OpenCV_wrapper wrapp;
-			wrapp.set_Tau(Decomp_threshold_);
+			wrapp.set_resolution(Map_Info_.resolution);
+			wrapp.set_distance_threshold(Decomp_threshold_);
 			Graph_Search Graph_searcher;
 			
 			Map_Info_ = map-> info;						
@@ -116,39 +119,27 @@ class ROS_handler
 			cv_ptr->header = map->header;
 
 	// Occupancy Grid to Image
-			//std::cout << "Occ_to_Image..... "; 		double start_occ2im = getTime();
-			cv::Mat Occ_Image = cv::Mat::zeros(map->info.height, map->info.width, CV_8UC1);	
-
-			for(unsigned int y = 0; y < map->info.height; y++) {
-				for(unsigned int x = 0; x < map->info.width; x++) {
-					unsigned int i = x + (map->info.height - y - 1) * map->info.width;
-					if (map->data[i] == 0) { //occ [0,0.1)
-						Occ_Image.at<char>(y,x)=255;
-				//		fputc(254, out);
-					} else if (map->data[i] == +100) { //occ (0.65,1]
-				//		fputc(000, out);
-						Occ_Image.at<char>(y,x)=0;
-					} else { //occ [0.1,0.65]
-				//		fputc(205, out);
-						Occ_Image.at<char>(y,x)=205;
-					}
-				}
-			}
 
 
 			//std::cout << "Occ_to_Image..... "; 		double start_occ2im = getTime();
 			cv::Mat img(map->info.width, map->info.height, CV_8U);
+			//cv::Mat_<char> img(map->info.width, map->info.height);
 			img.data = (unsigned char *)(&(map->data[0]) );
-			cv::flip(img,img,0);
-			//double end_occ2im = getTime();  cout << "done, it last "<<(end_occ2im-start_occ2im)<< " ms"  << endl;		
+//			cv::flip(img,img,0);			
+//			cv::Mat reduced_image = auto_resize(img);
+			
+
 
 	//////////////////////////////////////////////////////////
-			cv::flip(Occ_Image,Occ_Image,0);
-			cv::Rect resize_rect = wrapp.Decomposer(Occ_Image);
+//			cv::flip(Occ_Image,Occ_Image,0);
+			cv::Rect resize_rect = wrapp.Decomposer(img);
 
-			wrapp.measure_performance();
+//			wrapp.measure_performance();
+			
+			
 	/////////////////////////////////////////////////////////		
 	//  Graph Search
+	/*
 			insert_DuDe_Graph(wrapp, Graph_searcher);
 			cv::Mat Colored_Frontier = extract_frontier(Occ_Image, wrapp, Graph_searcher);
 			
@@ -176,24 +167,26 @@ class ROS_handler
 			
 	////////////
 	//Draw Image
-			cv::Mat Drawing = cv::Mat::zeros(Occ_Image.size().height, Occ_Image.size().width, CV_8UC1);	
+	//*
+			cv::Mat Drawing = cv::Mat::zeros(img.size().height, img.size().width, CV_8UC1);	
 			for(int i = 0; i <wrapp.Decomposed_contours.size();i++){
 				drawContours(Drawing, wrapp.Decomposed_contours, i, i+1, -1, 8);
 			}	
 			cv::flip(Drawing,Drawing,0);
 			for(int i = 0; i <wrapp.Decomposed_contours.size();i++){
 				stringstream mix;      mix<<i;				std::string text = mix.str();
-				putText(Drawing, text, cv::Point(wrapp.contours_centroid[i].x, Occ_Image.size().height - wrapp.contours_centroid[i].y ), cv::FONT_HERSHEY_SCRIPT_SIMPLEX, 0.5, wrapp.contours_centroid.size()+1, 1, 8);
+				putText(Drawing, text, cv::Point(wrapp.contours_centroid[i].x, img.size().height - wrapp.contours_centroid[i].y ), cv::FONT_HERSHEY_SCRIPT_SIMPLEX, 0.5, wrapp.contours_centroid.size()+1, 1, 8);
 			}	
-			
-	////////////////////////
 			cv::Mat croppedRef(Drawing, resize_rect);			
 			cv::Mat croppedImage;
-			croppedRef.copyTo(croppedImage);	
-
+			croppedRef.copyTo(croppedImage);
 			grad = croppedImage;
+			//*/
+			
+	////////////////////////
 
-//			grad = Occ_Image;
+
+//			grad = (img>90 & img<=100) ;
 
 	//////////////////////
 	/////PUBLISH
@@ -462,6 +455,20 @@ class ROS_handler
 
 
 
+/////////////////////////
+//UTILITY FUNCTIONS
+	//////////////////////////
+		cv::Mat auto_resize(cv::Mat img){
+			cv::Mat Disposable_Image = img<101;
+			std::vector<std::vector<cv::Point> > Explored_contour;
+			std::vector<cv::Vec4i> hierarchy; //[Next, Previous, First_Child, Parent]
+			cv::findContours(Disposable_Image, Explored_contour, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE );	
+			
+			cv::Mat croppedRef(img, boundingRect(Explored_contour[0]));			
+			cv::Mat croppedImage;
+			croppedRef.copyTo(croppedImage);
+			return croppedImage;
+		}
 		
 };
 
@@ -481,7 +488,7 @@ int main(int argc, char **argv)
   
   std::string mapname = "map";
   
-  float decomp_th=0.1;
+  float decomp_th = 3;
   if (argc ==2){ decomp_th = atof(argv[1]); }
 
 

@@ -15,6 +15,29 @@ void DuDe_OpenCV_wrapper::insert_contour_to_poly(std::vector<cv::Point> contour_
 	
 }	
 
+////////////////////////////
+void clean_open_space(cv::Mat &Image_in,cv::Mat &cut_image,cv::Mat Occ_Image){
+	cv::Mat Median_Image;
+	cv::Mat open_space = Occ_Image<10;
+	cv::Mat black_image = Occ_Image>90 & Occ_Image<=100;	
+	
+	cout << "Entering........ ";
+	cv::dilate(black_image, black_image, cv::Mat(), cv::Point(-1,-1), 4, cv::BORDER_CONSTANT, cv::morphologyDefaultBorderValue() );			
+	cout << "dilated........ ";
+	cv::medianBlur( open_space , Median_Image, 3);
+	cout << "Median Blur........ ";
+	Image_in = Median_Image & ~black_image;
+	cout << "And........ ";
+	Image_in.copyTo(cut_image);			
+	cout << "copy........ ";
+}
+
+//////////////////////////////
+void clean_only_obstacles(cv::Mat &Image_in,cv::Mat &cut_image,cv::Mat Occ_Image){
+	int a=1;
+}
+
+
 
 ////////////////////////////////////////
 cv::Rect DuDe_OpenCV_wrapper::Decomposer(cv::Mat Occ_Image){
@@ -22,20 +45,10 @@ cv::Rect DuDe_OpenCV_wrapper::Decomposer(cv::Mat Occ_Image){
 ///////////////////////////////	
 //Occupancy Image to Free Space	
 	std::cout << "Cleaning Image..... "; 		double start_cleaning = getTime();
-	cv::Mat thresholded_image = Occ_Image>210;
-	cv::Mat black_image = Occ_Image<10;	
-	cv::Mat Median_Image, Image_in, cut_image ;
-	{
-			cout << "Entering........ ";
-	cv::dilate(black_image, black_image, cv::Mat(), cv::Point(-1,-1), 4, cv::BORDER_CONSTANT, cv::morphologyDefaultBorderValue() );			
-	cout << "dilated........ ";
-	cv::medianBlur(Occ_Image>210, Median_Image, 3);
-	cout << "Median Blur........ ";
-	Image_in = Median_Image & ~black_image;
-	cout << "And........ ";
-	Image_in.copyTo(cut_image);			
-	cout << "copy........ ";
-	}
+	cv::Mat Image_in, cut_image ;
+	
+	clean_open_space(Image_in,cut_image,Occ_Image)	;
+
 	double end_cleaning = getTime();  cout << "done, it last "<<(end_cleaning-start_cleaning)<< " ms"  << endl;			
 
 ///////////////////////////////	
@@ -86,9 +99,9 @@ cv::Rect DuDe_OpenCV_wrapper::Decomposer(cv::Mat Occ_Image){
 ////////////////////////////////
 //// Decompose
 	//		cout << "Polygons size " << polygons.size() << endl;
-	cout << "- Dual-space Decomposition with tau=" << g_tau << endl;
+	cout << "- Dual-space Decomposition with tau=" << distance_threshold<< " meters" << endl;
 	float r = polygons.front().getRadius();
-	g_tau*=r;// Scale the concavity variable
+//	g_tau*=r;// Scale the concavity variable
 	double start_dude = getTime();
 	///////////////
 	Dual_decompose(polygons);
@@ -296,7 +309,6 @@ void DuDe_OpenCV_wrapper::print_graph(){
 	std::cout << std::endl;
 }
 
-
 ///////////////////////////
 void DuDe_OpenCV_wrapper::measure_performance(){
 	vector<float> convexities, compactness, qualities, areas;
@@ -358,6 +370,20 @@ void DuDe_OpenCV_wrapper::measure_performance(){
 		// CR/N \sum( q_i) +  \lambda exp( -(N-Ñ)/\Phi )   with \lambda 
 	
 }
+
+//////////////////////////
+void DuDe_OpenCV_wrapper::set_resolution(float resolution_in){
+	resolution = resolution_in;
+	g_tau= distance_threshold/resolution;
+}
+
+
+//////////////////////////
+void DuDe_OpenCV_wrapper::set_distance_threshold(float distance_threshold_in){
+	distance_threshold = distance_threshold_in;
+	g_tau= distance_threshold/resolution;
+}
+
 
 
 //

@@ -33,6 +33,8 @@ public:
 
 	double g_tau; //tolerance	
 	float Area_threshold;
+	float distance_threshold;
+	float resolution;
 	
 	c_dude dude;
 	Draw_Decoration draw_decoration;		
@@ -53,15 +55,20 @@ public:
 	
 	DuDe_OpenCV_wrapper(){
 	    Area_threshold=20;
-	    g_tau= 0.2;
+	    distance_threshold = 3; //3 meters default
+	    resolution = 0.05; // pixel/meters
+	    g_tau= distance_threshold/resolution; // threshold in pixels NOT percentage!
 	    dude= c_dude();
 	}
 	
 	~DuDe_OpenCV_wrapper(){
 	}
-
 	///////////////////////////////////
-	void set_Tau(float decomp_th ){g_tau=decomp_th;}
+	void set_resolution(float resolution_in);
+	///////////////////////////////////
+	void set_distance_threshold(float distance_threshold_in);
+	///////////////////////////////////
+//	void set_Tau(float decomp_th ){g_tau=decomp_th;}
 	///////////////////////////////////
 	void insert_contour_to_poly(std::vector<cv::Point> contour_in, 	c_ply& polygon );
 	////////////////////////////////////////
