@@ -89,6 +89,8 @@ public:
 	void print_graph();
 	////////////////////////////	
 	void measure_performance();
+	////////////////////////////	
+	void insert_rectangle_to_parent(cv::Rect &resize_rect, int pixel_separation);
 /////////////////////////////////////////		
 	
 		

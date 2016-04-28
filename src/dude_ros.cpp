@@ -177,7 +177,7 @@ class ROS_handler
 				stringstream mix;      mix<<i;				std::string text = mix.str();
 				putText(Drawing, text, cv::Point(wrapp.contours_centroid[i].x, img.size().height - wrapp.contours_centroid[i].y ), cv::FONT_HERSHEY_SCRIPT_SIMPLEX, 0.5, wrapp.contours_centroid.size()+1, 1, 8);
 			}	
-			cv::Mat croppedRef(Drawing, resize_rect);			
+			cv::Mat croppedRef(img, resize_rect);			
 			cv::Mat croppedImage;
 			croppedRef.copyTo(croppedImage);
 			grad = croppedImage;

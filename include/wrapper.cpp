@@ -2,18 +2,6 @@
 
 
 
-///////////////////////////////////
-void DuDe_OpenCV_wrapper::insert_contour_to_poly(std::vector<cv::Point> contour_in, 	c_ply& polygon ){
-
-	polygon.beginPoly();
-	for(int i=1;i <= contour_in.size();i++){
-		float x = contour_in[contour_in.size()-i].x;
-		float y = contour_in[contour_in.size()-i].y;
-		polygon.addVertex(x, y);
-	}
-	polygon.endPoly();
-	
-}	
 
 ////////////////////////////
 void clean_open_space(cv::Mat &Image_in,cv::Mat &cut_image,cv::Mat Occ_Image){
@@ -34,20 +22,85 @@ void clean_open_space(cv::Mat &Image_in,cv::Mat &cut_image,cv::Mat Occ_Image){
 
 //////////////////////////////
 void clean_only_obstacles(cv::Mat &Image_in,cv::Mat &cut_image,cv::Mat Occ_Image){
-	int a=1;
+	cv::Mat Median_Image;
+	cv::Mat black_image = Occ_Image>90 & Occ_Image<=100;	
+	
+	cout << "Entering........ ";
+	cv::dilate(black_image, black_image, cv::Mat(), cv::Point(-1,-1), 4, cv::BORDER_CONSTANT, cv::morphologyDefaultBorderValue() );			
+	cout << "dilated........ ";
+	Image_in = black_image;
+	cout << "And........ ";
+	Image_in.copyTo(cut_image);			
+	cout << "copy........ ";
 }
 
 
+////////////////////////////////
+void DuDe_OpenCV_wrapper::insert_rectangle_to_parent(cv::Rect &resize_rect, int pixel_separation){
+	cv::Rect temporal_rect(cv::Point(resize_rect.x - pixel_separation, resize_rect.y - pixel_separation),  cv::Point(resize_rect.br().x + pixel_separation, resize_rect.br().y + pixel_separation) );
+	Parent_contour.clear();
+/*
+	for(int i=0;i< temporal_rect.height;i++){
+		Parent_contour.push_back(cv::Point(temporal_rect.x ,         temporal_rect.y + i ));
+	}
+	
+	for(int i=0;i< temporal_rect.width;i++){
+		Parent_contour.push_back(cv::Point(temporal_rect.x + i,      temporal_rect.br().y ));
+	}
+
+	for(int i=0;i< temporal_rect.height;i++){
+		Parent_contour.push_back(cv::Point(temporal_rect.br().x ,    temporal_rect.br().y  - i));
+	}
+	
+	for(int i=0;i< temporal_rect.width;i++){
+		Parent_contour.push_back(cv::Point(temporal_rect.br().x -i,  temporal_rect.y ));
+	}	
+	//*/
+
+//*
+  	Parent_contour.push_back(temporal_rect.tl());	
+	Parent_contour.push_back(cv::Point(temporal_rect.x,       temporal_rect.br().y ));
+	Parent_contour.push_back(temporal_rect.br());	
+	Parent_contour.push_back(cv::Point(temporal_rect.br().x,  temporal_rect.y  ));
+	
+
+	//*/
+	resize_rect=temporal_rect;
+}
+
+///////////////////////////////////
+void DuDe_OpenCV_wrapper::insert_contour_to_poly(std::vector<cv::Point> contour_in, 	c_ply& polygon ){
+
+	polygon.beginPoly();
+	//*
+	for(int i=1;i <= contour_in.size();i++){
+		float x = contour_in[contour_in.size()-i].x;
+		float y = contour_in[contour_in.size()-i].y;
+		polygon.addVertex(x, y);
+	}
+	//*/
+	/*
+	for(int i=0;i <= contour_in.size();i++){
+		float x = contour_in[i].x;
+		float y = contour_in[i].y;
+		polygon.addVertex(x, y);
+	}
+	//*/
+	polygon.endPoly();
+	
+}	
 
 ////////////////////////////////////////
 cv::Rect DuDe_OpenCV_wrapper::Decomposer(cv::Mat Occ_Image){
+	float convex_separation = 2;// 1 meter
 	
 ///////////////////////////////	
 //Occupancy Image to Free Space	
 	std::cout << "Cleaning Image..... "; 		double start_cleaning = getTime();
 	cv::Mat Image_in, cut_image ;
 	
-	clean_open_space(Image_in,cut_image,Occ_Image)	;
+//	clean_open_space(Image_in,cut_image,Occ_Image);
+	clean_only_obstacles(Image_in,cut_image,Occ_Image);
 
 	double end_cleaning = getTime();  cout << "done, it last "<<(end_cleaning-start_cleaning)<< " ms"  << endl;			
 
@@ -56,43 +109,41 @@ cv::Rect DuDe_OpenCV_wrapper::Decomposer(cv::Mat Occ_Image){
 	std::cout << "Finding Contours....... "; double start_finding = getTime();
 	std::vector<std::vector<cv::Point> > Explored_contour;
 	std::vector<cv::Vec4i> hierarchy; //[Next, Previous, First_Child, Parent]
-	cv::findContours(cut_image, Explored_contour, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE );
+	cv::findContours(cut_image, Explored_contour, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_NONE );
 		
 	int current_index=0;
 	cv::Rect resize_rect = boundingRect(Explored_contour[0]);
-	float Big_Contour_area = cv::contourArea(Explored_contour[0]);
-	int Big_Contour_Index=0;
-	while(hierarchy[current_index][0] != -1){ // Find Bigger Area
+
+	while(hierarchy[current_index][0] != -1){ 
 		current_index=hierarchy[current_index][0];
-		float current_area = cv::contourArea(Explored_contour[current_index]);
 		resize_rect = resize_rect | boundingRect(Explored_contour[current_index]);
-		if(current_area > Big_Contour_area){
-			Big_Contour_area = current_area;
-			Big_Contour_Index = current_index;
-		}
 	}
 	double end_finding = getTime();  cout << "done, it last "<<(end_finding-start_finding)<< " ms"  << endl;			
-	Parent_contour = Explored_contour [Big_Contour_Index ];
+	
+	int pixel_separation = convex_separation/resolution;
+
+	insert_rectangle_to_parent(	resize_rect, pixel_separation);
+
+
 /////////////////////////////
 //// Insert contours in Dual-Space Decomposer 
 	std::cout << "Inserting contours ....... "; double start_inserting = getTime();
 	
 	c_polygon polygons;
 	{
+		//*
 		c_ply poly_out(c_ply::POUT);
-		insert_contour_to_poly( Explored_contour [Big_Contour_Index ], poly_out);
+		insert_contour_to_poly( Parent_contour, poly_out);
 		polygons.push_back(poly_out);
+//*/
+		current_index=0;				
+		do{ 
+			c_ply poly_in(c_ply::PIN);
+			insert_contour_to_poly( Explored_contour [current_index ], poly_in);
+			polygons.push_back(poly_in);
 
-		int current_child = hierarchy[ Big_Contour_Index ] [2];				
-		while(current_child !=-1){ //if child, insert
-			float Area = cv::contourArea(Explored_contour[current_child]);
-			if(Area > Area_threshold){
-				c_ply poly_in(c_ply::PIN);
-				insert_contour_to_poly( Explored_contour [current_child ], poly_in);
-				polygons.push_back(poly_in);
-			}
-			current_child = hierarchy[ current_child ] [0];
-		}
+			current_index=hierarchy[current_index][0];
+		}while(hierarchy[current_index][0] !=-1);
 	}
 	double end_inserting = getTime();  cout << "done, it last "<<(end_inserting-start_inserting)<< " ms"  << endl;			
 	
